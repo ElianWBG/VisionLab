@@ -1,0 +1,52 @@
+{% extends "processor/layout.html" %}
+
+{% block content %}
+<main class="page-shell">
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">LABORATORIO DE VISIÓN ARTIFICIAL</span>
+      <h1>Detecta celulares<br><span>en tiempo real.</span></h1>
+      <p>Activa la cámara y VisionLab marcará los celulares que aparezcan en cada fotograma.</p>
+    </div>
+    <div class="hero-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+  </section>
+
+  <section class="workspace" aria-label="Detector de objetos en tiempo real">
+    <div class="panel camera-panel">
+      <div class="panel-heading">
+        <span class="step">01</span>
+        <div><h2>Captura en vivo</h2><p>La cámara se procesa desde tu navegador</p></div>
+      </div>
+      <div class="video-stage">
+        <video id="camera" autoplay playsinline muted></video>
+        <canvas id="frameCanvas" width="640" height="480" hidden></canvas>
+        <img id="processedFrame" alt="Fotograma con objetos detectados" hidden>
+        <div class="camera-placeholder" id="placeholder"><span class="camera-symbol">◎</span><strong>La vista de cámara aparecerá aquí</strong><small>Permite el acceso a la cámara cuando el navegador lo solicite.</small></div>
+        <span class="live-badge" id="liveBadge" hidden><i></i> EN VIVO</span>
+      </div>
+      <div class="camera-actions">
+        <button class="button button-primary" id="startButton" type="button">Iniciar detección <span aria-hidden="true">↗</span></button>
+        <button class="button button-secondary" id="stopButton" type="button" disabled>Detener</button>
+      </div>
+      <p class="status-line" id="statusLine" role="status">Listo para iniciar. Se solicitará permiso para usar la cámara.</p>
+      <div class="privacy-note"><span aria-hidden="true">◈</span> Los fotogramas se procesan en el servidor durante la sesión; no se guardan como video.</div>
+    </div>
+
+    <div class="panel detections-panel">
+      <div class="panel-heading">
+        <span class="step">02</span>
+        <div><h2>Celulares detectados</h2><p>Detecciones en el fotograma más reciente</p></div>
+      </div>
+      <div class="summary-card"><span>DETECCIONES ACTUALES</span><strong id="currentTotal">0</strong><small id="frameCounter">0 fotogramas procesados</small></div>
+      <div class="detection-list" id="detectionList"><div class="empty-detections"><span>⌕</span><strong>Aún no hay detecciones</strong><small>Inicia la cámara para ver los objetos encontrados.</small></div></div>
+      <div class="model-note"><span class="model-dot"></span><div><strong>YOLO26 nano · clase celular</strong><small>COCO: cell phone · confianza mínima 35 %</small></div></div>
+    </div>
+  </section>
+
+  <section class="operations">
+    <div><span class="eyebrow">CÓMO FUNCIONA</span><h2>Del fotograma al celular detectado.</h2></div>
+    <div class="operation-list"><span>Captura del navegador</span><span>OpenCV procesa el fotograma</span><span>YOLO localiza celulares</span><span>Resumen en PostgreSQL</span></div>
+  </section>
+  <footer><span>VISIONLAB</span><span>Django · OpenCV · YOLO · PostgreSQL</span></footer>
+</main>
+{% endblock %}

@@ -1,0 +1,171 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="VisionLab detecta objetos en video en tiempo real con Django, OpenCV y YOLO.">
+  <title>VisionLab · Detector de objetos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body data-start-url="{% url 'start_session' %}" data-detect-url="{% url 'detect_frame' %}" data-finish-url="{% url 'finish_session' %}">
+  <header class="topbar"><a class="brand" href="{% url 'home' %}"><span class="brand-icon">V</span>VISION<span class="brand-light">LAB</span></a><span class="status"><i></i> SISTEMA DISPONIBLE</span></header>
+  <span class="csrf-token" hidden>{% csrf_token %}</span>
+  {% block content %}{% endblock %}
+  <script>
+    (() => {
+      const video = document.getElementById('camera');
+      if (!video) return;
+
+      const body = document.body;
+      const canvas = document.getElementById('frameCanvas');
+      const context = canvas.getContext('2d');
+      const processed = document.getElementById('processedFrame');
+      const placeholder = document.getElementById('placeholder');
+      const startButton = document.getElementById('startButton');
+      const stopButton = document.getElementById('stopButton');
+      const statusLine = document.getElementById('statusLine');
+      const liveBadge = document.getElementById('liveBadge');
+      const currentTotal = document.getElementById('currentTotal');
+      const frameCounter = document.getElementById('frameCounter');
+      const detectionList = document.getElementById('detectionList');
+      const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      let stream = null;
+      let timer = null;
+      let sessionId = null;
+      let frames = 0;
+      let totalCounts = {};
+      let inFlight = false;
+      let startedAt = 0;
+
+      function setStatus(message, state = '') {
+        statusLine.textContent = message;
+        statusLine.dataset.state = state;
+      }
+
+      async function postJson(url, data) {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+          body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'No se pudo completar la solicitud.');
+        return result;
+      }
+
+      function renderCounts(counts) {
+        const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const total = entries.reduce((sum, entry) => sum + entry[1], 0);
+        currentTotal.textContent = total;
+        if (!entries.length) {
+          detectionList.innerHTML = '<div class="empty-detections"><span>⌕</span><strong>No se detecta un celular en este fotograma</strong><small>Prueba con mejor iluminación y acerca el teléfono a la cámara.</small></div>';
+          return;
+        }
+        detectionList.innerHTML = entries.map(([name, count]) =>
+          `<div class="detection-row"><span class="object-icon">◇</span><span class="object-name">${escapeHtml(name)}</span><strong class="object-count">${count}</strong></div>`
+        ).join('');
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+      }
+
+      async function sendFrame() {
+        if (inFlight || !stream || video.readyState < 2) return;
+        inFlight = true;
+        try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frame = canvas.toDataURL('image/jpeg', 0.65);
+          const result = await postJson(body.dataset.detectUrl, { frame });
+          processed.src = result.image;
+          processed.hidden = false;
+          placeholder.hidden = true;
+          renderCounts(result.counts);
+          for (const [name, count] of Object.entries(result.counts)) {
+            totalCounts[name] = (totalCounts[name] || 0) + count;
+          }
+          frames += 1;
+          frameCounter.textContent = `${frames} fotogramas procesados`;
+          setStatus('Detección activa. Puedes detenerla cuando quieras.', 'active');
+        } catch (error) {
+          setStatus(error.message, 'error');
+        } finally {
+          inFlight = false;
+        }
+      }
+
+      async function start() {
+        startButton.disabled = true;
+        setStatus('Solicitando acceso a la cámara…');
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: 'environment' } }
+          });
+          video.srcObject = stream;
+          await video.play();
+          const session = await postJson(body.dataset.startUrl, {});
+          sessionId = session.session_id;
+          frames = 0;
+          totalCounts = {};
+          startedAt = Date.now();
+          stopButton.disabled = false;
+          liveBadge.hidden = false;
+          setStatus('Cargando el modelo y procesando los primeros fotogramas…');
+          timer = window.setInterval(sendFrame, 500);
+          sendFrame();
+        } catch (error) {
+          stopCamera();
+          startButton.disabled = false;
+          setStatus(error.name === 'NotAllowedError'
+            ? 'No se concedió permiso para usar la cámara.'
+            : (error.message || 'No se pudo iniciar la cámara.'), 'error');
+        }
+      }
+
+      function stopCamera() {
+        if (timer) window.clearInterval(timer);
+        timer = null;
+        if (stream) stream.getTracks().forEach((track) => track.stop());
+        stream = null;
+        video.srcObject = null;
+        liveBadge.hidden = true;
+        startButton.disabled = false;
+        stopButton.disabled = true;
+      }
+
+      async function stop() {
+        const oldSessionId = sessionId;
+        sessionId = null;
+        stopCamera();
+        while (inFlight) await new Promise((resolve) => window.setTimeout(resolve, 50));
+        if (oldSessionId) {
+          try {
+            await postJson(body.dataset.finishUrl, {
+              session_id: oldSessionId,
+              frames_processed: frames,
+              class_counts: totalCounts,
+              duration_seconds: Math.round((Date.now() - startedAt) / 1000)
+            });
+            setStatus('Sesión finalizada y resumen guardado en PostgreSQL.', 'active');
+          } catch (error) {
+            setStatus(`La cámara se detuvo, pero no se guardó el resumen: ${error.message}`, 'error');
+          }
+        } else {
+          setStatus('Cámara detenida.');
+        }
+      }
+
+      startButton.addEventListener('click', start);
+      stopButton.addEventListener('click', stop);
+      window.addEventListener('beforeunload', stopCamera);
+    })();
+  </script>
+</body>
+</html>

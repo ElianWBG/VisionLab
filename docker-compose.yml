@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-visionlab}
+      POSTGRES_USER: ${POSTGRES_USER:-visionlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-visionlab_local_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - visionlab_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visionlab} -d ${POSTGRES_DB:-visionlab}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  visionlab_postgres:

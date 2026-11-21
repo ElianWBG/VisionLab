@@ -1,0 +1,5 @@
+Django>=5.2,<6.0
+opencv-python>=4.10
+ultralytics>=8.4
+psycopg[binary]>=3.2
+python-dotenv>=1.0
