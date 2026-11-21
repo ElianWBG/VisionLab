@@ -38,22 +38,31 @@
       let sessionId = null;
       let frames = 0;
       let totalCounts = {};
-      let inFlight = false;
-      let startedAt = 0;
+      let pendingFrame = null;
+      let startPending = false;
+      let pageHidden = false;
 
       function setStatus(message, state = '') {
         statusLine.textContent = message;
         statusLine.dataset.state = state;
       }
 
-      async function postJson(url, data) {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-          body: JSON.stringify(data)
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'No se pudo completar la solicitud.');
+      async function postJson(url, data, keepalive = false) {
+        let response;
+        try {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify(data),
+            keepalive,
+            signal: keepalive ? undefined : AbortSignal.timeout(45000)
+          });
+        } catch {
+          throw new Error('No se pudo conectar con VisionLab o la solicitud tardó demasiado.');
+        }
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(result?.error || `VisionLab devolvió un error (${response.status}).`);
+        if (!result) throw new Error('VisionLab devolvió una respuesta inesperada.');
         return result;
       }
 
@@ -76,27 +85,30 @@
         }[char]));
       }
 
-      async function sendFrame() {
-        if (inFlight || !stream || video.readyState < 2) return;
-        inFlight = true;
+      function sendFrame() {
+        if (pendingFrame || !stream || video.readyState < 2) return;
+        pendingFrame = processFrame().finally(() => { pendingFrame = null; });
+      }
+
+      async function processFrame() {
         try {
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const frame = canvas.toDataURL('image/jpeg', 0.65);
           const result = await postJson(body.dataset.detectUrl, { frame });
-          processed.src = result.image;
-          processed.hidden = false;
-          placeholder.hidden = true;
-          renderCounts(result.counts);
+          if (stream) {
+            processed.src = result.image;
+            processed.hidden = false;
+            placeholder.hidden = true;
+            renderCounts(result.counts);
+          }
           for (const [name, count] of Object.entries(result.counts)) {
             totalCounts[name] = (totalCounts[name] || 0) + count;
           }
           frames += 1;
           frameCounter.textContent = `${frames} fotogramas procesados`;
-          setStatus('Detección activa. Puedes detenerla cuando quieras.', 'active');
+          if (stream) setStatus('Detección activa. Puedes detenerla cuando quieras.', 'active');
         } catch (error) {
-          setStatus(error.message, 'error');
-        } finally {
-          inFlight = false;
+          if (stream) setStatus(error.message, 'error');
         }
       }
 
@@ -104,24 +116,50 @@
         startButton.disabled = true;
         setStatus('Solicitando acceso a la cámara…');
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
+          const cameraStream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: { ideal: 'environment' } }
           });
+          if (pageHidden) {
+            cameraStream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          stream = cameraStream;
           video.srcObject = stream;
           await video.play();
-          const session = await postJson(body.dataset.startUrl, {});
-          sessionId = session.session_id;
+          if (pageHidden) return;
+          const track = cameraStream.getVideoTracks()[0];
           frames = 0;
           totalCounts = {};
-          startedAt = Date.now();
+          sessionId = crypto.randomUUID();
+          startPending = true;
+          await postJson(body.dataset.startUrl, { session_id: sessionId });
+          if (pageHidden) return;
+          startPending = false;
+          processed.hidden = true;
+          placeholder.hidden = false;
+          frameCounter.textContent = '0 fotogramas procesados';
+          renderCounts({});
           stopButton.disabled = false;
+          if (track.readyState === 'ended') {
+            await stop(true);
+            return;
+          }
+          track.addEventListener('ended', () => {
+            if (stream === cameraStream) stop(true);
+          }, { once: true });
           liveBadge.hidden = false;
           setStatus('Cargando el modelo y procesando los primeros fotogramas…');
           timer = window.setInterval(sendFrame, 500);
           sendFrame();
         } catch (error) {
           stopCamera();
+          if (pageHidden) return;
+          if (startPending) {
+            saveSession(sessionId, true).catch(() => {});
+            startPending = false;
+            sessionId = null;
+          }
           startButton.disabled = false;
           setStatus(error.name === 'NotAllowedError'
             ? 'No se concedió permiso para usar la cámara.'
@@ -136,35 +174,58 @@
         stream = null;
         video.srcObject = null;
         liveBadge.hidden = true;
-        startButton.disabled = false;
         stopButton.disabled = true;
       }
 
-      async function stop() {
-        const oldSessionId = sessionId;
-        sessionId = null;
+      function saveSession(id, keepalive = false) {
+        return postJson(body.dataset.finishUrl, {
+          session_id: id,
+          frames_processed: frames,
+          class_counts: totalCounts,
+          start_pending: startPending
+        }, keepalive);
+      }
+
+      async function stop(cameraDisconnected = false) {
+        if (!sessionId || stopButton.disabled) return;
+        const id = sessionId;
         stopCamera();
-        while (inFlight) await new Promise((resolve) => window.setTimeout(resolve, 50));
-        if (oldSessionId) {
-          try {
-            await postJson(body.dataset.finishUrl, {
-              session_id: oldSessionId,
-              frames_processed: frames,
-              class_counts: totalCounts,
-              duration_seconds: Math.round((Date.now() - startedAt) / 1000)
-            });
-            setStatus('Sesión finalizada y resumen guardado en PostgreSQL.', 'active');
-          } catch (error) {
-            setStatus(`La cámara se detuvo, pero no se guardó el resumen: ${error.message}`, 'error');
-          }
-        } else {
-          setStatus('Cámara detenida.');
+        if (cameraDisconnected) {
+          processed.hidden = true;
+          placeholder.hidden = false;
+          renderCounts({});
+        }
+        setStatus(cameraDisconnected ? 'Se desconectó la cámara. Guardando el resumen…' : 'Guardando el resumen…');
+        await pendingFrame;
+        if (sessionId !== id) return;
+        try {
+          await saveSession(id);
+          sessionId = null;
+          startButton.disabled = false;
+          stopButton.textContent = 'Detener';
+          setStatus(cameraDisconnected
+            ? 'Se desconectó la cámara. Resumen guardado.'
+            : 'Sesión finalizada y resumen guardado.', 'active');
+        } catch (error) {
+          stopButton.textContent = 'Reintentar guardado';
+          stopButton.disabled = false;
+          setStatus(`La cámara se detuvo, pero no se pudo guardar el resumen. ${error.message}`, 'error');
         }
       }
 
       startButton.addEventListener('click', start);
-      stopButton.addEventListener('click', stop);
-      window.addEventListener('beforeunload', stopCamera);
+      stopButton.addEventListener('click', () => stop());
+      window.addEventListener('pagehide', () => {
+        pageHidden = true;
+        stopCamera();
+        if (sessionId) {
+          saveSession(sessionId, true).catch(() => {});
+          sessionId = null;
+        }
+      });
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) window.location.reload();
+      });
     })();
   </script>
 </body>

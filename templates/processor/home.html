@@ -39,14 +39,14 @@
       </div>
       <div class="summary-card"><span>DETECCIONES ACTUALES</span><strong id="currentTotal">0</strong><small id="frameCounter">0 fotogramas procesados</small></div>
       <div class="detection-list" id="detectionList"><div class="empty-detections"><span>⌕</span><strong>Aún no hay detecciones</strong><small>Inicia la cámara para ver los objetos encontrados.</small></div></div>
-      <div class="model-note"><span class="model-dot"></span><div><strong>YOLO26 nano · clase celular</strong><small>COCO: cell phone · confianza mínima 35 %</small></div></div>
+      <div class="model-note"><span class="model-dot"></span><div><strong>YOLO · clase celular</strong><small>Confianza mínima {{ phone_confidence_percent }} %</small></div></div>
     </div>
   </section>
 
   <section class="operations">
     <div><span class="eyebrow">CÓMO FUNCIONA</span><h2>Del fotograma al celular detectado.</h2></div>
-    <div class="operation-list"><span>Captura del navegador</span><span>OpenCV procesa el fotograma</span><span>YOLO localiza celulares</span><span>Resumen en PostgreSQL</span></div>
+    <div class="operation-list"><span>Captura del navegador</span><span>OpenCV procesa el fotograma</span><span>YOLO localiza celulares</span><span>Guardado del resumen de sesión</span></div>
   </section>
-  <footer><span>VISIONLAB</span><span>Django · OpenCV · YOLO · PostgreSQL</span></footer>
+  <footer><span>VISIONLAB</span><span>Django · OpenCV · YOLO</span></footer>
 </main>
 {% endblock %}

@@ -7,11 +7,11 @@ Aplicación académica en Django para capturar video desde la cámara del navega
 - Captura de cámara desde el navegador con permiso explícito del usuario.
 - Envío de fotogramas JPEG de baja resolución al servidor y detección periódica.
 - Detección de celulares (clase `cell phone`, ID 67 del conjunto COCO); muestra cajas y conteos por fotograma.
-- Umbral de confianza configurable en `processor/services.py` (35 % por defecto).
+- Umbral de confianza del 65 % por defecto, configurable con `YOLO_PHONE_CONFIDENCE` en `.env` (valor entre 0 y 1). Un umbral más alto descarta detecciones dudosas y puede pasar por alto celulares pequeños o poco visibles.
 - Registro en PostgreSQL de duración, fotogramas y conteo acumulado por clase.
 - Límites de tamaño y resolución para los fotogramas enviados.
 
-El modelo preentrenado `yolo26n.pt` incluye la clase de celulares del conjunto COCO y se configura para mostrar solo esa clase. **No detecta cascos ni mascarillas con fiabilidad**, porque esas clases requieren pesos entrenados específicamente. Para usar otro modelo, define `YOLO_MODEL_PATH` con la ruta a tus pesos `.pt`.
+El modelo preentrenado `yolo26n.pt` incluye la clase `cell phone` del conjunto COCO. Para usar pesos de detección personalizados, define `YOLO_MODEL_PATH` con la ruta al archivo `.pt`. VisionLab identifica la clase por nombre y admite `cell phone`, `mobile phone`, `smartphone`, `phone`, `celular`, `telefono` y `teléfono`.
 
 ## Requisitos
 
