@@ -7,11 +7,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-visionlab}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-visionlab_local_password}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - visionlab_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visionlab} -d ${POSTGRES_DB:-visionlab}"]
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 5s
       retries: 10

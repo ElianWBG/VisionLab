@@ -15,34 +15,49 @@ El modelo preentrenado `yolo26n.pt` incluye la clase `cell phone` del conjunto C
 
 ## Requisitos
 
-- Python 3.10 o superior.
-- Docker Desktop o Docker Engine para ejecutar PostgreSQL localmente.
+- Python 3.12 de 64 bits, versión probada con las dependencias del proyecto.
+- PostgreSQL. Puedes usar Docker Compose con Docker Desktop o una instalación local de PostgreSQL.
 - Navegador con acceso a cámara. En localhost se permite cámara sin HTTPS.
-- Conexión a Internet la primera vez para descargar los pesos `yolo26n.pt`, salvo que ya tengas el archivo.
+- Conexión a Internet para instalar las dependencias y descargar los pesos `yolo26n.pt` en la primera inferencia. Si ya tienes los pesos, puedes indicar su ubicación con `YOLO_MODEL_PATH`.
 
 ## Inicio en Windows
 
-Desde PowerShell, en la carpeta del proyecto:
+Desde PowerShell, abre la carpeta del proyecto, donde están `manage.py` y `requirements.txt`. Conserva tu archivo `.env` si ya configuraste una base de datos.
 
 ```powershell
-Copy-Item .env.example .env
-docker compose up -d db
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-py manage.py migrate
-py manage.py runserver
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip check
 ```
 
-Abre `http://127.0.0.1:8000/`, permite el acceso a la cámara y pulsa **Iniciar detección**. La primera inferencia puede tardar mientras el modelo se descarga y carga.
+`requirements.txt` fija las versiones de las dependencias principales y el par compatible PyTorch/torchvision. La instalación de PyTorch puede tardar debido al tamaño de la descarga.
 
-Para detener PostgreSQL al terminar:
+### Configurar PostgreSQL
+
+**Con Docker Compose.** Abre Docker Desktop. Conserva `POSTGRES_HOST=127.0.0.1` en `.env`. Si el puerto `5432` ya está en uso, configura un puerto libre, por ejemplo `POSTGRES_PORT=55432`. Compose usa ese valor para publicar el puerto y Django para conectarse. Inicia el contenedor y espera a que esté listo.
 
 ```powershell
-docker compose down
+docker compose up -d --wait db
 ```
 
-Los datos de PostgreSQL permanecen en el volumen `visionlab_postgres`. Para eliminarlos también, ejecuta `docker compose down -v`.
+Si ya existe un volumen de PostgreSQL, usa las credenciales con las que se creó. Editar `.env` por sí solo no cambia las contraseñas de un volumen existente.
+
+**Con PostgreSQL instalado en Windows.** Asegúrate de que el servicio esté iniciado. Desde pgAdmin o `psql`, crea una base para VisionLab y un usuario con permiso de inicio de sesión que sea propietario de esa base. Escribe sus valores reales en `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD`. Ajusta `POSTGRES_HOST` y `POSTGRES_PORT` al servidor que estés usando.
+
+### Arrancar y probar VisionLab
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+Ejecuta los comandos en orden. Si `migrate` falla por autenticación, comprueba las credenciales en `.env` antes de arrancar el servidor. Si indica que no puede conectarse, verifica que PostgreSQL esté activo y que el puerto sea el correcto.
+
+Abre `http://127.0.0.1:8000/`, pulsa **Iniciar detección** y permite el acceso a la cámara. Muestra un celular para comprobar las cajas y el conteo. Pulsa **Detener** y espera el mensaje de confirmación del guardado. La primera inferencia puede tardar mientras se descargan y cargan los pesos `yolo26n.pt`.
+
+Para cerrar Django, pulsa **Ctrl+C** en PowerShell. Si iniciaste PostgreSQL con Docker Compose, puedes detenerlo con `docker compose down`. Los datos se conservan en el volumen de Compose.
 
 ## Variables de entorno
 

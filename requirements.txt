@@ -1,5 +1,8 @@
-Django>=5.2,<6.0
-opencv-python>=4.10
-ultralytics>=8.4
-psycopg[binary]>=3.2
-python-dotenv>=1.0
+Django==5.2.19
+numpy==2.5.5
+opencv-python==5.1.0.95
+psycopg[binary]==3.3.9
+python-dotenv==1.2.4
+torch==2.15.0
+torchvision==0.29.2
+ultralytics==8.4.216
