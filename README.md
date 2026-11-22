@@ -59,6 +59,37 @@ Abre `http://127.0.0.1:8000/`, pulsa **Iniciar detección** y permite el acceso 
 
 Para cerrar Django, pulsa **Ctrl+C** en PowerShell. Si iniciaste PostgreSQL con Docker Compose, puedes detenerlo con `docker compose down`. Los datos se conservan en el volumen de Compose.
 
+## Pruebas de la práctica 4
+
+Instala las dependencias de Python desde `requirements.txt` siguiendo **Inicio en Windows**. Luego ejecuta las pruebas desde la raíz del repositorio. La suite de Django usa SQLite en memoria y sustituye las predicciones de YOLO por respuestas controladas. Esta configuración solo se aplica a las pruebas. Durante el uso normal, VisionLab guarda los resúmenes en PostgreSQL.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test processor.tests --settings=visionlab.test_settings -v 2
+```
+
+La prueba complementaria de interfaz usa Node.js 20 o superior, sin paquetes adicionales. Simula una cámara y comprueba que el JavaScript muestra la imagen con detecciones, el conteo y la confirmación de guardado.
+
+```powershell
+node processor/tests/test_interface.cjs
+```
+
+Consulta el [reporte de ejecución](docs/practica-4-pruebas.txt) para ver los resultados y el alcance de las pruebas.
+
+| Tipo | Casos | Código |
+| --- | ---: | --- |
+| Unitarias | 4 | [Procesamiento de imágenes y selección de clases](processor/tests/test_detection.py) |
+| Integración | 5 | [Rutas, validación y ciclo de sesiones](processor/tests/test_routes.py) |
+| Funcionales | 2 | [Flujo Django de detección y guardado](processor/tests/test_functional.py) y [visualización en JavaScript](processor/tests/test_interface.cjs) |
+
+### Verificación con cámara física
+
+Sigue **Arrancar y probar VisionLab** usando PostgreSQL. Esta comprobación complementa la suite automatizada y sirve para obtener las capturas del informe.
+
+1. Abre VisionLab y pulsa **Iniciar detección**. Concede el permiso y confirma que aparezca **EN VIVO**.
+2. Muestra un celular y verifica que el fotograma muestre la caja y que el conteo aumente. Retira el celular y comprueba que el conteo vuelva a cero.
+3. Pulsa **Detener** y espera el mensaje de guardado. Comprueba que la sesión quede cerrada en el panel de administración si ya configuraste una cuenta.
+4. Prueba con el permiso de cámara denegado y verifica que la interfaz explique el problema.
+
 ## Variables de entorno
 
 El archivo `.env.example` contiene los valores locales de PostgreSQL, Django y el modelo. Antes de desplegar, cambia `DJANGO_SECRET_KEY` y `POSTGRES_PASSWORD`, establece `DJANGO_DEBUG=0` y configura `DJANGO_ALLOWED_HOSTS` con el dominio del servidor.

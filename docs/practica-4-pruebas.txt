@@ -1,0 +1,71 @@
+VisionLab | Práctica 4 | Reporte de pruebas
+22 de noviembre de 2026
+Entorno: Windows, Python 3.12 y Node.js 24.
+Django usa SQLite en memoria y predicciones controladas. JavaScript simula la cámara y las respuestas HTTP.
+Verificación adicional: pesos YOLO reales con un fotograma sintético vacío.
+La verificación con cámara física se documenta en el README.
+
+> python manage.py test processor.tests --settings=visionlab.test_settings -v 2
+Creating test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+
+Found 10 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: messages, staticfiles
+  Apply all migrations: admin, auth, contenttypes, processor, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying auth.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying processor.0001_initial... OK
+test_camera_frame_returns_overlay_and_persists_summary (processor.tests.test_functional.DetectionFlowTests.test_camera_frame_returns_overlay_and_persists_summary) ... ok
+test_closing_before_start_keeps_the_session_closed (processor.tests.test_routes.RouteTests.test_closing_before_start_keeps_the_session_closed) ... ok
+test_home_exposes_detection_and_session_routes (processor.tests.test_routes.RouteTests.test_home_exposes_detection_and_session_routes) ... ok
+test_invalid_inputs_return_json_errors (processor.tests.test_routes.RouteTests.test_invalid_inputs_return_json_errors) ... ok
+test_session_routes_require_post (processor.tests.test_routes.RouteTests.test_session_routes_require_post) ... ok
+test_start_requires_csrf_token (processor.tests.test_routes.RouteTests.test_start_requires_csrf_token) ... ok
+test_empty_predictions_return_empty_counts (processor.tests.test_detection.DetectionTests.test_empty_predictions_return_empty_counts) ... ok
+test_filters_phone_labels_and_encodes_annotated_image (processor.tests.test_detection.DetectionTests.test_filters_phone_labels_and_encodes_annotated_image) ... ok
+test_invalid_images_do_not_reach_yolo (processor.tests.test_detection.DetectionTests.test_invalid_images_do_not_reach_yolo) ... ok
+test_model_without_phone_class_is_rejected (processor.tests.test_detection.DetectionTests.test_model_without_phone_class_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.070s
+
+OK
+Destroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+
+  Applying sessions.0001_initial... OK
+System check identified no issues (0 silenced).
+
+> node processor/tests/test_interface.cjs
+✔ la interfaz muestra un fotograma anotado y guarda el resumen al detener (6.7655ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11.4477
+
+> Verificación adicional con YOLO real (fotograma sintético de 640 x 480)
+7 objects imported automatically (use -v 2 for details).
+
+OK: YOLO real devolvió una imagen JPEG sin detecciones.
